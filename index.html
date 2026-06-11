@@ -7,13 +7,20 @@
   <style>
     :root {
       --bg: #f4efe8;
-      --paper: rgba(255, 251, 245, 0.88);
+      --paper: rgba(255, 251, 245, 0.9);
       --line: rgba(67, 49, 34, 0.12);
       --ink: #2f241b;
       --muted: #7a6858;
       --accent: #c6662d;
       --accent-deep: #8f4318;
       --shadow: 0 18px 45px rgba(72, 45, 20, 0.14);
+      --page-gap: 20px;
+      --sidebar-width: 300px;
+      --grid-gap: 16px;
+      --chrome-height: 250px;
+      --tile-width-by-height: calc((100vh - (var(--page-gap) * 2) - var(--chrome-height) - (var(--grid-gap) * 2)) * 9 / 48);
+      --tile-width-by-width: calc((100vw - (var(--page-gap) * 2) - var(--sidebar-width) - 20px - 40px - (var(--grid-gap) * 2)) / 3);
+      --tile-width: min(var(--tile-width-by-height), var(--tile-width-by-width));
     }
 
     * { box-sizing: border-box; }
@@ -21,6 +28,7 @@
     body {
       margin: 0;
       min-height: 100vh;
+      overflow: hidden;
       font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
       color: var(--ink);
       background:
@@ -29,11 +37,16 @@
         linear-gradient(180deg, #f8f2ea 0%, #f2ece3 100%);
     }
 
+    button,
+    input {
+      font: inherit;
+    }
+
     .app {
       display: grid;
-      grid-template-columns: 260px minmax(0, 1fr);
+      grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
       gap: 20px;
-      min-height: 100vh;
+      height: 100vh;
       padding: 20px;
     }
 
@@ -49,6 +62,8 @@
       padding: 20px;
       display: flex;
       flex-direction: column;
+      min-height: 0;
+      gap: 16px;
     }
 
     .sidebar h1 {
@@ -57,10 +72,23 @@
     }
 
     .sidebar p {
-      margin: 0 0 18px;
+      margin: 0;
       color: var(--muted);
       font-size: 14px;
       line-height: 1.7;
+    }
+
+    .sidebar-section {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 0;
+    }
+
+    .section-title {
+      font-size: 13px;
+      color: var(--muted);
+      letter-spacing: 0.08em;
     }
 
     .folder-list {
@@ -68,6 +96,7 @@
       gap: 10px;
       overflow: auto;
       padding-right: 4px;
+      max-height: 210px;
     }
 
     .folder-button {
@@ -90,16 +119,68 @@
       background: rgba(255, 244, 234, 0.98);
     }
 
+    .asset-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      overflow: auto;
+      padding-right: 4px;
+      min-height: 0;
+    }
+
+    .asset-card {
+      border: 1px solid rgba(67, 49, 34, 0.08);
+      border-radius: 14px;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.84);
+      cursor: grab;
+      transition: transform 120ms ease, box-shadow 120ms ease;
+    }
+
+    .asset-card:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 24px rgba(72, 45, 20, 0.12);
+    }
+
+    .asset-card img {
+      width: 100%;
+      aspect-ratio: 1;
+      display: block;
+      object-fit: cover;
+      background: #e8ddd2;
+    }
+
+    .asset-card span {
+      display: block;
+      padding: 8px 10px 10px;
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
     .main {
       padding: 20px;
       display: flex;
       flex-direction: column;
-      gap: 18px;
+      gap: 16px;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .mode-tabs,
+    .ratio-tabs,
+    .layer-actions,
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
     }
 
     .toolbar {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: space-between;
       gap: 16px;
       flex-wrap: wrap;
@@ -114,12 +195,7 @@
       color: var(--muted);
       font-size: 14px;
       margin-top: 6px;
-    }
-
-    .actions {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
+      line-height: 1.6;
     }
 
     button {
@@ -148,8 +224,7 @@
       color: var(--accent-deep);
     }
 
-    .primary:disabled,
-    .secondary:disabled {
+    button:disabled {
       opacity: 0.55;
       cursor: not-allowed;
       box-shadow: none;
@@ -161,17 +236,75 @@
       color: var(--muted);
     }
 
+    .controls-card {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.5);
+      display: none;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .controls-card.active {
+      display: flex;
+    }
+
+    .custom-size {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .custom-size input {
+      width: 88px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 8px 10px;
+      background: rgba(255, 255, 255, 0.92);
+      color: var(--ink);
+    }
+
+    .content {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow: hidden;
+    }
+
+    .grid-view,
+    .free-view {
+      min-height: 0;
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      overflow: hidden;
+      flex: 1;
+    }
+
+    .grid-view.active,
+    .free-view.active {
+      display: flex;
+    }
+
     .grid {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 16px;
+      grid-template-columns: repeat(3, minmax(0, var(--tile-width)));
+      gap: var(--grid-gap);
+      justify-content: center;
+      align-content: start;
+      min-height: 0;
     }
 
     .card {
       position: relative;
       aspect-ratio: 9 / 16;
       overflow: hidden;
-      border-radius: 0;
       background: #e8ddd2;
       border: 1px solid rgba(67, 49, 34, 0.08);
     }
@@ -234,25 +367,194 @@
     .arrow.left { left: 10px; }
     .arrow.right { right: 10px; }
 
+    .canvas-shell {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,0.54), rgba(255,255,255,0.18)),
+        repeating-linear-gradient(
+          45deg,
+          rgba(255,255,255,0.22),
+          rgba(255,255,255,0.22) 14px,
+          rgba(235,225,214,0.55) 14px,
+          rgba(235,225,214,0.55) 28px
+        );
+    }
+
+    .canvas-stage {
+      position: relative;
+      flex: none;
+    }
+
+    .canvas-board {
+      position: relative;
+      background: #fff;
+      overflow: hidden;
+      box-shadow: 0 18px 48px rgba(40, 24, 14, 0.18);
+    }
+
+    .canvas-board.drag-over {
+      outline: 3px dashed rgba(198, 102, 45, 0.5);
+      outline-offset: -10px;
+    }
+
+    .canvas-empty {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      font-size: 16px;
+      text-align: center;
+      pointer-events: none;
+      padding: 30px;
+    }
+
+    .canvas-item {
+      position: absolute;
+      border: 2px solid transparent;
+      touch-action: none;
+      user-select: none;
+    }
+
+    .canvas-item.selected {
+      border-color: rgba(198, 102, 45, 0.72);
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.9) inset;
+    }
+
+    .canvas-item img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: fill;
+      pointer-events: none;
+    }
+
+    .handle {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      background: #fff;
+      border: 2px solid var(--accent);
+      border-radius: 50%;
+      z-index: 2;
+    }
+
+    .handle.corner { cursor: nwse-resize; }
+    .handle.corner.tr,
+    .handle.corner.bl { cursor: nesw-resize; }
+    .handle.edge.top,
+    .handle.edge.bottom { cursor: ns-resize; }
+    .handle.edge.left,
+    .handle.edge.right { cursor: ew-resize; }
+
+    .handle.tl { left: -7px; top: -7px; }
+    .handle.tr { right: -7px; top: -7px; }
+    .handle.bl { left: -7px; bottom: -7px; }
+    .handle.br { right: -7px; bottom: -7px; }
+    .handle.top { left: calc(50% - 6px); top: -7px; }
+    .handle.bottom { left: calc(50% - 6px); bottom: -7px; }
+    .handle.left { left: -7px; top: calc(50% - 6px); }
+    .handle.right { right: -7px; top: calc(50% - 6px); }
+
+    .mini-note {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.6;
+      margin: 0;
+    }
+
+    @media (max-width: 1100px) {
+      :root {
+        --sidebar-width: 260px;
+        --tile-width-by-width: calc((100vw - (var(--page-gap) * 2) - var(--sidebar-width) - 20px - 40px - (var(--grid-gap) * 2)) / 3);
+      }
+    }
+
     @media (max-width: 980px) {
-      .app { grid-template-columns: 1fr; }
+      :root {
+        --tile-width-by-width: calc((100vw - (var(--page-gap) * 2) - 40px - (var(--grid-gap) * 2)) / 3);
+      }
+
+      body {
+        overflow: auto;
+      }
+
+      .app {
+        grid-template-columns: 1fr;
+        height: auto;
+        min-height: 100vh;
+      }
+
+      .main,
+      .sidebar,
+      .content,
+      .grid-view,
+      .free-view {
+        overflow: visible;
+      }
+
+      .asset-list {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
     }
 
     @media (max-width: 760px) {
-      .grid { grid-template-columns: 1fr; }
-      .toolbar h2 { font-size: 22px; }
+      body {
+        overflow: auto;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+        justify-content: stretch;
+      }
+
+      .card {
+        max-width: 360px;
+        margin: 0 auto;
+      }
+
+      .asset-list {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .toolbar h2 {
+        font-size: 22px;
+      }
     }
   </style>
 </head>
 <body>
   <div class="app">
     <aside class="panel sidebar">
-      <h1>图片文件夹</h1>
-      <p>把你的图片子文件夹放到同目录下的 `img` 文件夹里，然后双击启动工具即可使用。</p>
-      <div id="folderList" class="folder-list"></div>
+      <div>
+        <h1>图片文件夹</h1>
+        <p>把你的图片子文件夹放到同目录下的 `img` 文件夹里，然后双击启动工具即可使用。</p>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="section-title">文件夹</div>
+        <div id="folderList" class="folder-list"></div>
+      </div>
+
+      <div class="sidebar-section" style="flex: 1;">
+        <div class="section-title">图片素材</div>
+        <div id="assetList" class="asset-list"></div>
+      </div>
     </aside>
 
     <main class="panel main">
+      <div class="mode-tabs">
+        <button id="gridModeButton" class="secondary active-mode" type="button">九宫格</button>
+        <button id="freeModeButton" class="secondary" type="button">自由画布</button>
+      </div>
+
       <div class="toolbar">
         <div>
           <h2 id="folderTitle">请选择文件夹</h2>
@@ -267,12 +569,58 @@
         </div>
       </div>
 
+      <div id="freeControls" class="controls-card">
+        <div class="ratio-tabs">
+          <button class="secondary active-mode ratio-button" type="button" data-ratio="9:16">9:16</button>
+          <button class="secondary ratio-button" type="button" data-ratio="3:4">3:4</button>
+          <button class="secondary ratio-button" type="button" data-ratio="1:1">1:1</button>
+          <button class="secondary ratio-button" type="button" data-ratio="custom">自定义</button>
+        </div>
+        <label class="custom-size">
+          宽
+          <input id="customWidthInput" type="number" min="1" step="1" value="900" />
+        </label>
+        <label class="custom-size">
+          高
+          <input id="customHeightInput" type="number" min="1" step="1" value="1600" />
+        </label>
+        <button id="applyCustomSizeButton" class="secondary" type="button">应用尺寸</button>
+        <div class="layer-actions">
+          <button id="bringForwardButton" class="secondary" type="button">上移一层</button>
+          <button id="sendBackwardButton" class="secondary" type="button">下移一层</button>
+          <button id="deleteItemButton" class="secondary" type="button">删除选中</button>
+          <button id="clearCanvasButton" class="secondary" type="button">清空画布</button>
+        </div>
+      </div>
+
       <div id="status" class="status">正在读取文件夹列表...</div>
-      <section id="grid" class="grid"></section>
+
+      <div class="content">
+        <section id="gridView" class="grid-view active">
+          <section id="grid" class="grid"></section>
+        </section>
+
+        <section id="freeView" class="free-view">
+          <div id="canvasShell" class="canvas-shell">
+            <div id="canvasStage" class="canvas-stage">
+              <div id="canvasBoard" class="canvas-board">
+                <div id="canvasEmpty" class="canvas-empty">把左侧图片拖到这里开始自由排版</div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
     </main>
   </div>
 
   <script>
+    const PRESET_RATIOS = {
+      "9:16": { width: 900, height: 1600 },
+      "3:4": { width: 900, height: 1200 },
+      "1:1": { width: 1000, height: 1000 }
+    };
+
+    const MIN_ITEM_SIZE = 40;
     const state = {
       folders: [],
       currentFolder: null,
@@ -281,23 +629,65 @@
       slotIndices: [],
       page: 0,
       pageSize: 9,
-      fitMode: "contain"
+      fitMode: "contain",
+      mode: "grid",
+      freeCanvas: {
+        ratioKey: "9:16",
+        width: PRESET_RATIOS["9:16"].width,
+        height: PRESET_RATIOS["9:16"].height,
+        displayScale: 1,
+        items: [],
+        selectedItemId: null,
+        nextId: 1
+      },
+      dragSession: null
     };
 
     const folderListEl = document.getElementById("folderList");
+    const assetListEl = document.getElementById("assetList");
     const folderTitleEl = document.getElementById("folderTitle");
     const folderMetaEl = document.getElementById("folderMeta");
     const statusEl = document.getElementById("status");
     const gridEl = document.getElementById("grid");
+    const gridViewEl = document.getElementById("gridView");
+    const freeViewEl = document.getElementById("freeView");
     const prevPageButton = document.getElementById("prevPage");
     const nextPageButton = document.getElementById("nextPage");
     const saveButton = document.getElementById("saveButton");
     const fitModeButton = document.getElementById("fitModeButton");
     const saveSelectionButton = document.getElementById("saveSelectionButton");
+    const gridModeButton = document.getElementById("gridModeButton");
+    const freeModeButton = document.getElementById("freeModeButton");
+    const freeControlsEl = document.getElementById("freeControls");
+    const ratioButtons = Array.from(document.querySelectorAll(".ratio-button"));
+    const customWidthInput = document.getElementById("customWidthInput");
+    const customHeightInput = document.getElementById("customHeightInput");
+    const applyCustomSizeButton = document.getElementById("applyCustomSizeButton");
+    const bringForwardButton = document.getElementById("bringForwardButton");
+    const sendBackwardButton = document.getElementById("sendBackwardButton");
+    const deleteItemButton = document.getElementById("deleteItemButton");
+    const clearCanvasButton = document.getElementById("clearCanvasButton");
+    const canvasShellEl = document.getElementById("canvasShell");
+    const canvasStageEl = document.getElementById("canvasStage");
+    const canvasBoardEl = document.getElementById("canvasBoard");
+    const canvasEmptyEl = document.getElementById("canvasEmpty");
 
     function setStatus(message, isError = false) {
       statusEl.textContent = message;
       statusEl.style.color = isError ? "#b2421f" : "";
+    }
+
+    function getPageCount() {
+      return Math.max(1, Math.ceil(state.images.length / state.pageSize));
+    }
+
+    function getVisibleSlotCount() {
+      return Math.min(state.pageSize, Math.max(0, state.images.length - state.page * state.pageSize));
+    }
+
+    function updateFitModeButton() {
+      fitModeButton.textContent = state.fitMode === "contain" ? "长宽适配" : "裁切填满";
+      fitModeButton.classList.toggle("active-mode", state.fitMode === "cover");
     }
 
     function renderFolders() {
@@ -312,17 +702,29 @@
       });
     }
 
-    function getPageCount() {
-      return Math.max(1, Math.ceil(state.images.length / state.pageSize));
-    }
+    function renderAssets() {
+      assetListEl.innerHTML = "";
 
-    function getVisibleSlotCount() {
-      return Math.min(state.pageSize, Math.max(0, state.images.length - state.page * state.pageSize));
-    }
+      if (state.images.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "mini-note";
+        empty.textContent = state.currentFolder ? "当前文件夹没有可用图片。" : "先选择一个文件夹。";
+        assetListEl.appendChild(empty);
+        return;
+      }
 
-    function updateFitModeButton() {
-      fitModeButton.textContent = state.fitMode === "contain" ? "长宽适配" : "裁切填满";
-      fitModeButton.classList.toggle("active-mode", state.fitMode === "cover");
+      state.images.forEach((image, index) => {
+        const card = document.createElement("div");
+        card.className = "asset-card";
+        card.draggable = true;
+        card.dataset.imageIndex = String(index);
+        card.innerHTML = `<img src="${image.url}" alt="${image.name}" draggable="false" /><span>${image.name}</span>`;
+        card.addEventListener("dragstart", (event) => {
+          event.dataTransfer.setData("text/plain", String(index));
+          event.dataTransfer.effectAllowed = "copy";
+        });
+        assetListEl.appendChild(card);
+      });
     }
 
     function applySavedSelection(folderName, images) {
@@ -443,18 +845,198 @@
         card.appendChild(right);
         gridEl.appendChild(card);
       }
+    }
 
-      const totalPages = getPageCount();
-      prevPageButton.disabled = state.page <= 0 || state.images.length === 0;
-      nextPageButton.disabled = state.page >= totalPages - 1 || state.images.length === 0;
-      fitModeButton.disabled = state.images.length === 0;
-      saveSelectionButton.disabled = state.images.length === 0;
-      saveButton.disabled = state.images.length === 0;
+    function syncCustomInputs() {
+      customWidthInput.value = String(Math.round(state.freeCanvas.width));
+      customHeightInput.value = String(Math.round(state.freeCanvas.height));
+    }
+
+    function setCanvasRatio(ratioKey, width, height) {
+      state.freeCanvas.ratioKey = ratioKey;
+      state.freeCanvas.width = Math.max(1, width);
+      state.freeCanvas.height = Math.max(1, height);
+      syncCustomInputs();
+      renderFreeCanvas();
+      updateModeUi();
+    }
+
+    function createFreeCanvasItem(imageIndex, point) {
+      const image = state.images[imageIndex];
+      if (!image) return;
+
+      const canvas = state.freeCanvas;
+      const baseWidth = Math.max(160, Math.round(canvas.width * 0.36));
+      const baseHeight = Math.max(160, Math.round(baseWidth * 1.1));
+      const x = typeof point?.x === "number" ? point.x - baseWidth / 2 : (canvas.width - baseWidth) / 2;
+      const y = typeof point?.y === "number" ? point.y - baseHeight / 2 : (canvas.height - baseHeight) / 2;
+
+      const item = {
+        id: canvas.nextId++,
+        imageIndex,
+        x: clamp(x, 0, canvas.width - baseWidth),
+        y: clamp(y, 0, canvas.height - baseHeight),
+        width: Math.min(baseWidth, canvas.width),
+        height: Math.min(baseHeight, canvas.height),
+        z: getNextZ()
+      };
+
+      canvas.items.push(item);
+      canvas.selectedItemId = item.id;
+      renderFreeCanvas();
+    }
+
+    function getNextZ() {
+      if (state.freeCanvas.items.length === 0) return 1;
+      return Math.max(...state.freeCanvas.items.map((item) => item.z)) + 1;
+    }
+
+    function normalizeZOrder() {
+      state.freeCanvas.items
+        .sort((a, b) => a.z - b.z)
+        .forEach((item, index) => {
+          item.z = index + 1;
+        });
+    }
+
+    function selectCanvasItem(itemId, bringToFront = false) {
+      state.freeCanvas.selectedItemId = itemId;
+      if (bringToFront) {
+        const item = state.freeCanvas.items.find((entry) => entry.id === itemId);
+        if (item) item.z = getNextZ();
+        normalizeZOrder();
+      }
+      renderFreeCanvas();
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(Math.max(value, min), max);
+    }
+
+    function stagePointFromClient(clientX, clientY) {
+      const boardRect = canvasBoardEl.getBoundingClientRect();
+      const scale = getStageScale();
+      return {
+        x: clamp((clientX - boardRect.left) / scale, 0, state.freeCanvas.width),
+        y: clamp((clientY - boardRect.top) / scale, 0, state.freeCanvas.height)
+      };
+    }
+
+    function getStageScale() {
+      return state.freeCanvas.displayScale || 1;
+    }
+
+    function makeHandle(position) {
+      const handle = document.createElement("div");
+      const isCorner = ["tl", "tr", "bl", "br"].includes(position);
+      handle.className = `handle ${isCorner ? "corner" : "edge"} ${positionToClass(position)}`;
+      handle.dataset.handle = position;
+      return handle;
+    }
+
+    function positionToClass(position) {
+      const map = {
+        tl: "tl",
+        tr: "tr",
+        bl: "bl",
+        br: "br",
+        top: "top",
+        bottom: "bottom",
+        left: "left",
+        right: "right"
+      };
+      return map[position];
+    }
+
+    function renderFreeCanvas() {
+      const canvas = state.freeCanvas;
+      const shellRect = canvasShellEl.getBoundingClientRect();
+      const availableWidth = Math.max(120, shellRect.width - 8);
+      const availableHeight = Math.max(120, shellRect.height - 8);
+      const scale = Math.min(availableWidth / canvas.width, availableHeight / canvas.height, 1);
+      canvas.displayScale = scale;
+
+      const displayWidth = Math.max(1, Math.round(canvas.width * scale));
+      const displayHeight = Math.max(1, Math.round(canvas.height * scale));
+      canvasStageEl.style.width = `${displayWidth}px`;
+      canvasStageEl.style.height = `${displayHeight}px`;
+      canvasBoardEl.style.width = `${displayWidth}px`;
+      canvasBoardEl.style.height = `${displayHeight}px`;
+
+      canvasBoardEl.innerHTML = "";
+      canvasEmptyEl.style.display = canvas.items.length === 0 ? "grid" : "none";
+      canvasBoardEl.appendChild(canvasEmptyEl);
+
+      canvas.items
+        .slice()
+        .sort((a, b) => a.z - b.z)
+        .forEach((item) => {
+          const image = state.images[item.imageIndex];
+          if (!image) return;
+
+          const itemEl = document.createElement("div");
+          itemEl.className = "canvas-item" + (item.id === canvas.selectedItemId ? " selected" : "");
+          itemEl.style.left = `${item.x * scale}px`;
+          itemEl.style.top = `${item.y * scale}px`;
+          itemEl.style.width = `${item.width * scale}px`;
+          itemEl.style.height = `${item.height * scale}px`;
+          itemEl.style.zIndex = String(item.z);
+          itemEl.dataset.itemId = String(item.id);
+
+          const img = document.createElement("img");
+          img.src = image.url;
+          img.alt = image.name;
+          img.draggable = false;
+          itemEl.appendChild(img);
+
+          ["tl", "tr", "bl", "br", "top", "bottom", "left", "right"].forEach((position) => {
+            itemEl.appendChild(makeHandle(position));
+          });
+
+          itemEl.addEventListener("pointerdown", onCanvasItemPointerDown);
+          canvasBoardEl.appendChild(itemEl);
+        });
+
+      updateModeUi();
+    }
+
+    function updateModeUi() {
+      const isGrid = state.mode === "grid";
+      gridViewEl.classList.toggle("active", isGrid);
+      freeViewEl.classList.toggle("active", !isGrid);
+      freeControlsEl.classList.toggle("active", !isGrid);
+      gridModeButton.classList.toggle("active-mode", isGrid);
+      freeModeButton.classList.toggle("active-mode", !isGrid);
+
+      prevPageButton.style.display = isGrid ? "" : "none";
+      nextPageButton.style.display = isGrid ? "" : "none";
+      fitModeButton.style.display = isGrid ? "" : "none";
+      saveSelectionButton.style.display = isGrid ? "" : "none";
+
+      const hasSelection = !!state.freeCanvas.items.find((item) => item.id === state.freeCanvas.selectedItemId);
+      bringForwardButton.disabled = !hasSelection;
+      sendBackwardButton.disabled = !hasSelection;
+      deleteItemButton.disabled = !hasSelection;
+      clearCanvasButton.disabled = state.freeCanvas.items.length === 0;
+
+      ratioButtons.forEach((button) => {
+        button.classList.toggle("active-mode", button.dataset.ratio === state.freeCanvas.ratioKey);
+      });
+
+      folderMetaEl.textContent = isGrid
+        ? (
+          state.currentFolder
+            ? `共 ${state.images.length} 张图片，第 ${state.page + 1} / ${getPageCount()} 页，每页显示 9 张。`
+            : "每页显示 9 张，鼠标移入图片后可左右切换。"
+        )
+        : `自由画布 ${Math.round(state.freeCanvas.width)} × ${Math.round(state.freeCanvas.height)}，导出时按最短边 1280 自动缩放。左侧图片可直接拖入画布，支持移动、层级和缩放。`;
+
+      saveButton.disabled = state.images.length === 0 || (!isGrid && state.freeCanvas.items.length === 0);
+      prevPageButton.disabled = isGrid ? state.page <= 0 || state.images.length === 0 : true;
+      nextPageButton.disabled = isGrid ? state.page >= getPageCount() - 1 || state.images.length === 0 : true;
+      fitModeButton.disabled = isGrid ? state.images.length === 0 : true;
+      saveSelectionButton.disabled = isGrid ? state.images.length === 0 : true;
       updateFitModeButton();
-
-      folderMetaEl.textContent = state.currentFolder
-        ? `共 ${state.images.length} 张图片，第 ${state.page + 1} / ${totalPages} 页，每页显示 9 张。`
-        : "每页显示 9 张，鼠标移入图片后可左右切换。";
     }
 
     async function loadFolders() {
@@ -470,6 +1052,8 @@
         } else {
           setStatus("请先把图片文件夹放进同目录下的 img 文件夹里。");
           renderGrid();
+          renderAssets();
+          renderFreeCanvas();
         }
       } catch {
         setStatus("读取文件夹失败，请检查本地服务是否正常运行。", true);
@@ -486,6 +1070,9 @@
         const images = await response.json();
         state.images = images;
         applySavedSelection(folderName, images);
+        state.freeCanvas.items = [];
+        state.freeCanvas.selectedItemId = null;
+        state.freeCanvas.nextId = 1;
         folderTitleEl.textContent = folderName;
 
         if (images.length === 0) {
@@ -495,10 +1082,14 @@
         }
 
         renderGrid();
+        renderAssets();
+        renderFreeCanvas();
       } catch {
         state.images = [];
         state.slotIndices = [];
         renderGrid();
+        renderAssets();
+        renderFreeCanvas();
         setStatus(`读取 ${folderName} 失败。`, true);
       }
     }
@@ -545,12 +1136,7 @@
     }
 
     async function saveCurrentGrid() {
-      if (!state.currentFolder || state.images.length === 0) return;
-
-      saveButton.disabled = true;
-      setStatus("正在生成并保存合并图片...");
-
-      const width = 1080;
+      const width = 1280;
       const gap = 16;
       const tileWidth = Math.floor((width - gap * 2) / 3);
       const tileHeight = Math.round(tileWidth * 16 / 9);
@@ -569,6 +1155,7 @@
       for (let slot = 0; slot < visibleCount; slot += 1) {
         const imageIndex = state.slotIndices[start + slot];
         const image = state.images[imageIndex];
+        if (!image) continue;
         loaders.push(loadImage(image.url).then((img) => ({ img, slot })));
       }
 
@@ -585,10 +1172,60 @@
         }
       });
 
-      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
-      const base64 = await blobToBase64(blob);
+      return canvas;
+    }
+
+    function getFreeExportSize() {
+      const baseWidth = state.freeCanvas.width;
+      const baseHeight = state.freeCanvas.height;
+      const scale = 1280 / Math.min(baseWidth, baseHeight);
+      return {
+        width: Math.round(baseWidth * scale),
+        height: Math.round(baseHeight * scale),
+        scale
+      };
+    }
+
+    async function saveFreeCanvas() {
+      const exportSize = getFreeExportSize();
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d");
+      canvas.width = exportSize.width;
+      canvas.height = exportSize.height;
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, exportSize.width, exportSize.height);
+
+      const loaders = state.freeCanvas.items.map(async (item) => ({
+        item,
+        img: await loadImage(state.images[item.imageIndex].url)
+      }));
+
+      const loaded = await Promise.all(loaders);
+      loaded
+        .sort((a, b) => a.item.z - b.item.z)
+        .forEach(({ item, img }) => {
+          context.drawImage(
+            img,
+            item.x * exportSize.scale,
+            item.y * exportSize.scale,
+            item.width * exportSize.scale,
+            item.height * exportSize.scale
+          );
+        });
+
+      return canvas;
+    }
+
+    async function saveCurrentComposition() {
+      if (!state.currentFolder || state.images.length === 0) return;
+
+      saveButton.disabled = true;
+      setStatus("正在生成并保存合并图片...");
 
       try {
+        const canvas = state.mode === "grid" ? await saveCurrentGrid() : await saveFreeCanvas();
+        const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.92));
+        const base64 = await blobToBase64(blob);
         const response = await fetch("/api/save-collage", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -604,34 +1241,241 @@
       } catch (error) {
         setStatus(`保存失败：${error.message}`, true);
       } finally {
-        saveButton.disabled = false;
+        updateModeUi();
       }
     }
+
+    function switchMode(mode) {
+      state.mode = mode;
+      updateModeUi();
+      if (mode === "free") renderFreeCanvas();
+    }
+
+    function onCanvasItemPointerDown(event) {
+      const itemEl = event.currentTarget;
+      const itemId = Number(itemEl.dataset.itemId);
+      const item = state.freeCanvas.items.find((entry) => entry.id === itemId);
+      if (!item) return;
+
+      const handle = event.target.closest(".handle")?.dataset.handle;
+      const startPoint = stagePointFromClient(event.clientX, event.clientY);
+      state.dragSession = {
+        itemId,
+        type: handle ? "resize" : "move",
+        handle,
+        startPoint,
+        origin: { x: item.x, y: item.y, width: item.width, height: item.height }
+      };
+
+      selectCanvasItem(itemId, true);
+      itemEl.setPointerCapture(event.pointerId);
+      event.preventDefault();
+    }
+
+    function resizeFromHandle(origin, handle, dx, dy) {
+      let { x, y, width, height } = origin;
+      const ratio = origin.width / origin.height;
+
+      if (["tl", "tr", "bl", "br"].includes(handle)) {
+        const signX = handle.includes("l") ? -1 : 1;
+        const signY = handle.includes("t") ? -1 : 1;
+        const change = Math.abs(Math.abs(dx) > Math.abs(dy) ? dx : dy) * (Math.abs(dx) > Math.abs(dy) ? signX : signY);
+        const nextWidth = Math.max(MIN_ITEM_SIZE, origin.width + change * signX);
+        const nextHeight = Math.max(MIN_ITEM_SIZE, nextWidth / ratio);
+
+        width = nextWidth;
+        height = nextHeight;
+        if (handle.includes("l")) x = origin.x + (origin.width - width);
+        if (handle.includes("t")) y = origin.y + (origin.height - height);
+      } else if (handle === "left") {
+        x = origin.x + dx;
+        width = origin.width - dx;
+      } else if (handle === "right") {
+        width = origin.width + dx;
+      } else if (handle === "top") {
+        y = origin.y + dy;
+        height = origin.height - dy;
+      } else if (handle === "bottom") {
+        height = origin.height + dy;
+      }
+
+      if (width < MIN_ITEM_SIZE) {
+        if (handle === "left") x -= MIN_ITEM_SIZE - width;
+        width = MIN_ITEM_SIZE;
+      }
+      if (height < MIN_ITEM_SIZE) {
+        if (handle === "top") y -= MIN_ITEM_SIZE - height;
+        height = MIN_ITEM_SIZE;
+      }
+
+      return constrainItemRect({ x, y, width, height });
+    }
+
+    function constrainItemRect(rect) {
+      const maxWidth = state.freeCanvas.width;
+      const maxHeight = state.freeCanvas.height;
+      const width = clamp(rect.width, MIN_ITEM_SIZE, maxWidth);
+      const height = clamp(rect.height, MIN_ITEM_SIZE, maxHeight);
+      const x = clamp(rect.x, 0, maxWidth - width);
+      const y = clamp(rect.y, 0, maxHeight - height);
+      return { x, y, width, height };
+    }
+
+    function onWindowPointerMove(event) {
+      const session = state.dragSession;
+      if (!session) return;
+
+      const item = state.freeCanvas.items.find((entry) => entry.id === session.itemId);
+      if (!item) return;
+
+      const point = stagePointFromClient(event.clientX, event.clientY);
+      const dx = point.x - session.startPoint.x;
+      const dy = point.y - session.startPoint.y;
+
+      if (session.type === "move") {
+        item.x = clamp(session.origin.x + dx, 0, state.freeCanvas.width - item.width);
+        item.y = clamp(session.origin.y + dy, 0, state.freeCanvas.height - item.height);
+      } else {
+        Object.assign(item, resizeFromHandle(session.origin, session.handle, dx, dy));
+      }
+
+      renderFreeCanvas();
+    }
+
+    function onWindowPointerUp() {
+      state.dragSession = null;
+    }
+
+    function shiftSelectedItem(direction) {
+      const items = state.freeCanvas.items;
+      const selected = items.find((item) => item.id === state.freeCanvas.selectedItemId);
+      if (!selected) return;
+
+      normalizeZOrder();
+      if (direction > 0) {
+        selected.z = Math.min(items.length, selected.z + 1);
+      } else {
+        selected.z = Math.max(1, selected.z - 1);
+      }
+
+      items.forEach((item) => {
+        if (item.id !== selected.id && item.z === selected.z) {
+          item.z += direction > 0 ? -1 : 1;
+        }
+      });
+
+      normalizeZOrder();
+      renderFreeCanvas();
+    }
+
+    function deleteSelectedItem() {
+      const selectedId = state.freeCanvas.selectedItemId;
+      if (!selectedId) return;
+      state.freeCanvas.items = state.freeCanvas.items.filter((item) => item.id !== selectedId);
+      state.freeCanvas.selectedItemId = state.freeCanvas.items.at(-1)?.id ?? null;
+      normalizeZOrder();
+      renderFreeCanvas();
+    }
+
+    canvasBoardEl.addEventListener("dragover", (event) => {
+      if (state.mode !== "free") return;
+      event.preventDefault();
+      canvasBoardEl.classList.add("drag-over");
+    });
+
+    canvasBoardEl.addEventListener("dragleave", (event) => {
+      if (!canvasBoardEl.contains(event.relatedTarget)) {
+        canvasBoardEl.classList.remove("drag-over");
+      }
+    });
+
+    canvasBoardEl.addEventListener("drop", (event) => {
+      if (state.mode !== "free") return;
+      event.preventDefault();
+      canvasBoardEl.classList.remove("drag-over");
+      const imageIndex = Number(event.dataTransfer.getData("text/plain"));
+      if (!Number.isInteger(imageIndex)) return;
+      createFreeCanvasItem(imageIndex, stagePointFromClient(event.clientX, event.clientY));
+      setStatus(`已把图片加入自由画布，可继续拖动和缩放。`);
+    });
+
+    canvasBoardEl.addEventListener("pointerdown", (event) => {
+      if (event.target === canvasBoardEl || event.target === canvasEmptyEl) {
+        state.freeCanvas.selectedItemId = null;
+        renderFreeCanvas();
+      }
+    });
 
     prevPageButton.addEventListener("click", () => {
       state.page = Math.max(0, state.page - 1);
       renderGrid();
+      updateModeUi();
     });
 
     nextPageButton.addEventListener("click", () => {
       state.page = Math.min(getPageCount() - 1, state.page + 1);
       renderGrid();
+      updateModeUi();
     });
 
     fitModeButton.addEventListener("click", () => {
       state.fitMode = state.fitMode === "contain" ? "cover" : "contain";
       renderGrid();
+      updateModeUi();
     });
 
     saveSelectionButton.addEventListener("click", () => {
       saveCurrentSelection(true);
     });
 
-    saveButton.addEventListener("click", saveCurrentGrid);
+    saveButton.addEventListener("click", saveCurrentComposition);
+    gridModeButton.addEventListener("click", () => switchMode("grid"));
+    freeModeButton.addEventListener("click", () => switchMode("free"));
+
+    ratioButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const ratioKey = button.dataset.ratio;
+        if (ratioKey === "custom") {
+          state.freeCanvas.ratioKey = "custom";
+          updateModeUi();
+          return;
+        }
+        const preset = PRESET_RATIOS[ratioKey];
+        setCanvasRatio(ratioKey, preset.width, preset.height);
+      });
+    });
+
+    applyCustomSizeButton.addEventListener("click", () => {
+      const width = Number(customWidthInput.value);
+      const height = Number(customHeightInput.value);
+      if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+        setStatus("自定义尺寸请输入大于 0 的宽高。", true);
+        return;
+      }
+      setCanvasRatio("custom", Math.round(width), Math.round(height));
+    });
+
+    bringForwardButton.addEventListener("click", () => shiftSelectedItem(1));
+    sendBackwardButton.addEventListener("click", () => shiftSelectedItem(-1));
+    deleteItemButton.addEventListener("click", deleteSelectedItem);
+    clearCanvasButton.addEventListener("click", () => {
+      state.freeCanvas.items = [];
+      state.freeCanvas.selectedItemId = null;
+      renderFreeCanvas();
+    });
+
+    window.addEventListener("pointermove", onWindowPointerMove);
+    window.addEventListener("pointerup", onWindowPointerUp);
+    window.addEventListener("resize", () => {
+      if (state.mode === "free") renderFreeCanvas();
+    });
 
     async function init() {
+      syncCustomInputs();
       await loadSavedSelections();
       await loadFolders();
+      updateModeUi();
+      renderFreeCanvas();
     }
 
     init();
