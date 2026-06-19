@@ -17,8 +17,12 @@
       --page-gap: 20px;
       --sidebar-width: 300px;
       --grid-gap: 16px;
-      --chrome-height: 250px;
-      --tile-width-by-height: calc((100vh - (var(--page-gap) * 2) - var(--chrome-height) - (var(--grid-gap) * 2)) * 9 / 48);
+      --grid-columns: 3;
+      --grid-rows: 3;
+      --card-ratio-width: 9;
+      --card-ratio-height: 16;
+      --chrome-height: 300px;
+      --tile-width-by-height: calc(((100vh - (var(--page-gap) * 2) - var(--chrome-height) - (var(--grid-gap) * (var(--grid-rows) - 1))) / var(--grid-rows)) * var(--card-ratio-width) / var(--card-ratio-height));
       --tile-width-by-width: calc((100vw - (var(--page-gap) * 2) - var(--sidebar-width) - 20px - 40px - (var(--grid-gap) * 2)) / 3);
       --tile-width: min(var(--tile-width-by-height), var(--tile-width-by-width));
     }
@@ -251,6 +255,10 @@
       display: flex;
     }
 
+    .layer-actions.grid-hidden {
+      display: none;
+    }
+
     .custom-size {
       display: flex;
       align-items: center;
@@ -294,7 +302,7 @@
 
     .grid {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, var(--tile-width)));
+      grid-template-columns: repeat(var(--grid-columns), minmax(0, var(--tile-width)));
       gap: var(--grid-gap);
       justify-content: center;
       align-content: start;
@@ -303,7 +311,7 @@
 
     .card {
       position: relative;
-      aspect-ratio: 9 / 16;
+      aspect-ratio: var(--card-ratio-width) / var(--card-ratio-height);
       overflow: hidden;
       background: #e8ddd2;
       border: 1px solid rgba(67, 49, 34, 0.08);
@@ -511,13 +519,8 @@
       }
 
       .grid {
-        grid-template-columns: 1fr;
-        justify-content: stretch;
-      }
-
-      .card {
-        max-width: 360px;
-        margin: 0 auto;
+        grid-template-columns: repeat(var(--grid-columns), minmax(0, var(--tile-width)));
+        justify-content: center;
       }
 
       .asset-list {
@@ -558,7 +561,7 @@
       <div class="toolbar">
         <div>
           <h2 id="folderTitle">请选择文件夹</h2>
-          <div id="folderMeta" class="toolbar-meta">每页显示 9 张，鼠标移入图片后可左右切换。</div>
+          <div id="folderMeta" class="toolbar-meta">9宫格，单格 900 × 1600，鼠标移入图片后可左右切换。</div>
         </div>
         <div class="actions">
           <button id="prevPage" class="secondary" type="button">上一页</button>
@@ -570,6 +573,11 @@
       </div>
 
       <div id="freeControls" class="controls-card">
+        <div class="ratio-tabs">
+          <button class="secondary grid-size-button" type="button" data-page-size="6">6宫格</button>
+          <button class="secondary active-mode grid-size-button" type="button" data-page-size="9">9宫格</button>
+          <button class="secondary grid-size-button" type="button" data-page-size="12">12宫格</button>
+        </div>
         <div class="ratio-tabs">
           <button class="secondary active-mode ratio-button" type="button" data-ratio="9:16">9:16</button>
           <button class="secondary ratio-button" type="button" data-ratio="3:4">3:4</button>
@@ -631,8 +639,12 @@
       pageSize: 9,
       fitMode: "contain",
       mode: "grid",
-      freeCanvas: {
+      canvasSize: {
         ratioKey: "9:16",
+        width: PRESET_RATIOS["9:16"].width,
+        height: PRESET_RATIOS["9:16"].height
+      },
+      freeCanvas: {
         width: PRESET_RATIOS["9:16"].width,
         height: PRESET_RATIOS["9:16"].height,
         displayScale: 1,
@@ -659,6 +671,7 @@
     const gridModeButton = document.getElementById("gridModeButton");
     const freeModeButton = document.getElementById("freeModeButton");
     const freeControlsEl = document.getElementById("freeControls");
+    const gridSizeButtons = Array.from(document.querySelectorAll(".grid-size-button"));
     const ratioButtons = Array.from(document.querySelectorAll(".ratio-button"));
     const customWidthInput = document.getElementById("customWidthInput");
     const customHeightInput = document.getElementById("customHeightInput");
@@ -679,6 +692,29 @@
 
     function getPageCount() {
       return Math.max(1, Math.ceil(state.images.length / state.pageSize));
+    }
+
+    function getGridRows() {
+      return Math.ceil(state.pageSize / 3);
+    }
+
+    function syncFreeCanvasSize() {
+      state.freeCanvas.width = state.canvasSize.width;
+      state.freeCanvas.height = state.canvasSize.height;
+      state.freeCanvas.items = state.freeCanvas.items.map((item) => ({
+        ...item,
+        ...constrainItemRect(item)
+      }));
+    }
+
+    function updateGridCssVars() {
+      document.documentElement.style.setProperty("--grid-rows", String(getGridRows()));
+      document.documentElement.style.setProperty("--card-ratio-width", String(state.canvasSize.width));
+      document.documentElement.style.setProperty("--card-ratio-height", String(state.canvasSize.height));
+    }
+
+    function clampPage() {
+      state.page = Math.max(0, Math.min(state.page, getPageCount() - 1));
     }
 
     function getVisibleSlotCount() {
@@ -731,9 +767,33 @@
       const saved = state.savedSelections[folderName];
       state.slotIndices = images.map((_, index) => index);
       state.page = 0;
+      state.pageSize = 9;
       state.fitMode = "contain";
+      state.canvasSize.ratioKey = "9:16";
+      state.canvasSize.width = PRESET_RATIOS["9:16"].width;
+      state.canvasSize.height = PRESET_RATIOS["9:16"].height;
 
-      if (!saved) return;
+      if (!saved) {
+        syncFreeCanvasSize();
+        syncCustomInputs();
+        updateGridCssVars();
+        return;
+      }
+
+      if ([6, 9, 12].includes(saved.pageSize)) {
+        state.pageSize = saved.pageSize;
+      }
+
+      if (["9:16", "3:4", "1:1"].includes(saved.ratioKey)) {
+        const preset = PRESET_RATIOS[saved.ratioKey];
+        state.canvasSize.ratioKey = saved.ratioKey;
+        state.canvasSize.width = preset.width;
+        state.canvasSize.height = preset.height;
+      } else if (saved.ratioKey === "custom" && Number.isFinite(saved.width) && Number.isFinite(saved.height) && saved.width > 0 && saved.height > 0) {
+        state.canvasSize.ratioKey = "custom";
+        state.canvasSize.width = Math.round(saved.width);
+        state.canvasSize.height = Math.round(saved.height);
+      }
 
       if (Array.isArray(saved.slotIndices) && saved.slotIndices.length === images.length) {
         const validIndices = saved.slotIndices.every((value) => Number.isInteger(value) && value >= 0 && value < images.length);
@@ -741,12 +801,17 @@
       }
 
       if (Number.isInteger(saved.page)) {
-        state.page = Math.max(0, Math.min(saved.page, Math.ceil(images.length / state.pageSize) - 1));
+        state.page = saved.page;
       }
 
       if (saved.fitMode === "cover" || saved.fitMode === "contain") {
         state.fitMode = saved.fitMode;
       }
+
+      clampPage();
+      syncFreeCanvasSize();
+      syncCustomInputs();
+      updateGridCssVars();
     }
 
     async function loadSavedSelections() {
@@ -769,7 +834,11 @@
             folderName: state.currentFolder,
             slotIndices: state.slotIndices,
             page: state.page,
-            fitMode: state.fitMode
+            fitMode: state.fitMode,
+            pageSize: state.pageSize,
+            ratioKey: state.canvasSize.ratioKey,
+            width: state.canvasSize.width,
+            height: state.canvasSize.height
           })
         });
 
@@ -779,7 +848,11 @@
         state.savedSelections[state.currentFolder] = {
           slotIndices: [...state.slotIndices],
           page: state.page,
-          fitMode: state.fitMode
+          fitMode: state.fitMode,
+          pageSize: state.pageSize,
+          ratioKey: state.canvasSize.ratioKey,
+          width: state.canvasSize.width,
+          height: state.canvasSize.height
         };
 
         if (showStatus) setStatus(`已记住 ${state.currentFolder} 的选图结果。`);
@@ -797,6 +870,7 @@
     }
 
     function renderGrid() {
+      updateGridCssVars();
       gridEl.innerHTML = "";
       const start = state.page * state.pageSize;
       const visibleCount = getVisibleSlotCount();
@@ -848,16 +922,27 @@
     }
 
     function syncCustomInputs() {
-      customWidthInput.value = String(Math.round(state.freeCanvas.width));
-      customHeightInput.value = String(Math.round(state.freeCanvas.height));
+      customWidthInput.value = String(Math.round(state.canvasSize.width));
+      customHeightInput.value = String(Math.round(state.canvasSize.height));
     }
 
     function setCanvasRatio(ratioKey, width, height) {
-      state.freeCanvas.ratioKey = ratioKey;
-      state.freeCanvas.width = Math.max(1, width);
-      state.freeCanvas.height = Math.max(1, height);
+      state.canvasSize.ratioKey = ratioKey;
+      state.canvasSize.width = Math.max(1, width);
+      state.canvasSize.height = Math.max(1, height);
+      syncFreeCanvasSize();
       syncCustomInputs();
-      renderFreeCanvas();
+      updateGridCssVars();
+      renderGrid();
+      if (state.mode === "free") renderFreeCanvas();
+      updateModeUi();
+    }
+
+    function setGridPageSize(pageSize) {
+      state.pageSize = pageSize;
+      clampPage();
+      updateGridCssVars();
+      renderGrid();
       updateModeUi();
     }
 
@@ -868,16 +953,18 @@
       const canvas = state.freeCanvas;
       const baseWidth = Math.max(160, Math.round(canvas.width * 0.36));
       const baseHeight = Math.max(160, Math.round(baseWidth * 1.1));
-      const x = typeof point?.x === "number" ? point.x - baseWidth / 2 : (canvas.width - baseWidth) / 2;
-      const y = typeof point?.y === "number" ? point.y - baseHeight / 2 : (canvas.height - baseHeight) / 2;
+      const itemWidth = Math.min(baseWidth, canvas.width);
+      const itemHeight = Math.min(baseHeight, canvas.height);
+      const x = typeof point?.x === "number" ? point.x - itemWidth / 2 : (canvas.width - itemWidth) / 2;
+      const y = typeof point?.y === "number" ? point.y - itemHeight / 2 : (canvas.height - itemHeight) / 2;
 
       const item = {
         id: canvas.nextId++,
         imageIndex,
-        x: clamp(x, 0, canvas.width - baseWidth),
-        y: clamp(y, 0, canvas.height - baseHeight),
-        width: Math.min(baseWidth, canvas.width),
-        height: Math.min(baseHeight, canvas.height),
+        x: clamp(x, 0, canvas.width - itemWidth),
+        y: clamp(y, 0, canvas.height - itemHeight),
+        width: itemWidth,
+        height: itemHeight,
         z: getNextZ()
       };
 
@@ -1004,9 +1091,10 @@
       const isGrid = state.mode === "grid";
       gridViewEl.classList.toggle("active", isGrid);
       freeViewEl.classList.toggle("active", !isGrid);
-      freeControlsEl.classList.toggle("active", !isGrid);
+      freeControlsEl.classList.toggle("active", true);
       gridModeButton.classList.toggle("active-mode", isGrid);
       freeModeButton.classList.toggle("active-mode", !isGrid);
+      document.querySelector(".layer-actions").classList.toggle("grid-hidden", isGrid);
 
       prevPageButton.style.display = isGrid ? "" : "none";
       nextPageButton.style.display = isGrid ? "" : "none";
@@ -1019,17 +1107,22 @@
       deleteItemButton.disabled = !hasSelection;
       clearCanvasButton.disabled = state.freeCanvas.items.length === 0;
 
+      gridSizeButtons.forEach((button) => {
+        button.classList.toggle("active-mode", Number(button.dataset.pageSize) === state.pageSize);
+        button.style.display = isGrid ? "" : "none";
+      });
+
       ratioButtons.forEach((button) => {
-        button.classList.toggle("active-mode", button.dataset.ratio === state.freeCanvas.ratioKey);
+        button.classList.toggle("active-mode", button.dataset.ratio === state.canvasSize.ratioKey);
       });
 
       folderMetaEl.textContent = isGrid
         ? (
           state.currentFolder
-            ? `共 ${state.images.length} 张图片，第 ${state.page + 1} / ${getPageCount()} 页，每页显示 9 张。`
-            : "每页显示 9 张，鼠标移入图片后可左右切换。"
+            ? `共 ${state.images.length} 张图片，第 ${state.page + 1} / ${getPageCount()} 页，${state.pageSize}宫格，单格 ${Math.round(state.canvasSize.width)} × ${Math.round(state.canvasSize.height)}。`
+            : `${state.pageSize}宫格，单格 ${Math.round(state.canvasSize.width)} × ${Math.round(state.canvasSize.height)}，鼠标移入图片后可左右切换。`
         )
-        : `自由画布 ${Math.round(state.freeCanvas.width)} × ${Math.round(state.freeCanvas.height)}，导出时按最短边 1280 自动缩放。左侧图片可直接拖入画布，支持移动、层级和缩放。`;
+        : `自由画布 ${Math.round(state.canvasSize.width)} × ${Math.round(state.canvasSize.height)}，导出时按最短边 1280 自动缩放。左侧图片可直接拖入画布，支持移动、层级和缩放。`;
 
       saveButton.disabled = state.images.length === 0 || (!isGrid && state.freeCanvas.items.length === 0);
       prevPageButton.disabled = isGrid ? state.page <= 0 || state.images.length === 0 : true;
@@ -1139,8 +1232,9 @@
       const width = 1280;
       const gap = 16;
       const tileWidth = Math.floor((width - gap * 2) / 3);
-      const tileHeight = Math.round(tileWidth * 16 / 9);
-      const height = tileHeight * 3 + gap * 2;
+      const tileHeight = Math.round(tileWidth * state.canvasSize.height / state.canvasSize.width);
+      const rows = getGridRows();
+      const height = tileHeight * rows + gap * (rows - 1);
       const canvas = document.createElement("canvas");
       const context = canvas.getContext("2d");
       canvas.width = width;
@@ -1176,8 +1270,8 @@
     }
 
     function getFreeExportSize() {
-      const baseWidth = state.freeCanvas.width;
-      const baseHeight = state.freeCanvas.height;
+      const baseWidth = state.canvasSize.width;
+      const baseHeight = state.canvasSize.height;
       const scale = 1280 / Math.min(baseWidth, baseHeight);
       return {
         width: Math.round(baseWidth * scale),
@@ -1432,11 +1526,17 @@
     gridModeButton.addEventListener("click", () => switchMode("grid"));
     freeModeButton.addEventListener("click", () => switchMode("free"));
 
+    gridSizeButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        setGridPageSize(Number(button.dataset.pageSize));
+      });
+    });
+
     ratioButtons.forEach((button) => {
       button.addEventListener("click", () => {
         const ratioKey = button.dataset.ratio;
         if (ratioKey === "custom") {
-          state.freeCanvas.ratioKey = "custom";
+          state.canvasSize.ratioKey = "custom";
           updateModeUi();
           return;
         }
@@ -1471,6 +1571,8 @@
     });
 
     async function init() {
+      updateGridCssVars();
+      syncFreeCanvasSize();
       syncCustomInputs();
       await loadSavedSelections();
       await loadFolders();

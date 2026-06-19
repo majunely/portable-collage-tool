@@ -12,6 +12,10 @@ const stateFilePath = path.join(rootDir, "selection-state.json");
 const port = 3000;
 const imageExtensions = new Set([".jpg", ".jpeg", ".png", ".webp", ".bmp"]);
 
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function sendJson(response, statusCode, data) {
   response.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
   response.end(JSON.stringify(data));
@@ -57,13 +61,14 @@ async function listFolders() {
 async function listImages(folderName) {
   const folderPath = sanitizeFolderName(folderName);
   const entries = await readdir(folderPath, { withFileTypes: true });
+  const generatedCollagePattern = new RegExp(`^${escapeRegExp(folderName)}\\+合并(?:\\(\\d+\\))?\\.jpg$`, "i");
 
   return entries
     .filter((entry) => {
       if (!entry.isFile()) return false;
       const extension = path.extname(entry.name).toLowerCase();
       if (!imageExtensions.has(extension)) return false;
-      return entry.name !== `${folderName}+合并.jpg`;
+      return !generatedCollagePattern.test(entry.name);
     })
     .map((entry) => ({
       name: entry.name,
@@ -74,12 +79,23 @@ async function listImages(folderName) {
 
 async function saveCollage(folderName, imageData) {
   const folderPath = sanitizeFolderName(folderName);
-  const fileName = `${folderName}+合并.jpg`;
-  const outputPath = path.join(folderPath, fileName);
   const base64 = String(imageData).replace(/^data:image\/\w+;base64,/, "");
   const buffer = Buffer.from(base64, "base64");
-  await writeFile(outputPath, buffer);
-  return fileName;
+
+  for (let index = 0; index < 1000; index += 1) {
+    const suffix = index === 0 ? "" : `(${index})`;
+    const fileName = `${folderName}+合并${suffix}.jpg`;
+    const outputPath = path.join(folderPath, fileName);
+
+    try {
+      await writeFile(outputPath, buffer, { flag: "wx" });
+      return fileName;
+    } catch (error) {
+      if (error.code !== "EEXIST") throw error;
+    }
+  }
+
+  throw new Error("合并照片数量过多，请清理旧文件后再保存");
 }
 
 async function readSelectionState() {
@@ -142,6 +158,10 @@ async function handleRequest(request, response) {
           slotIndices: Array.isArray(payload.slotIndices) ? payload.slotIndices : [],
           page: Number.isInteger(payload.page) ? payload.page : 0,
           fitMode: payload.fitMode === "cover" ? "cover" : "contain",
+          pageSize: [6, 9, 12].includes(payload.pageSize) ? payload.pageSize : 9,
+          ratioKey: ["9:16", "3:4", "1:1", "custom"].includes(payload.ratioKey) ? payload.ratioKey : "9:16",
+          width: Number.isFinite(payload.width) && payload.width > 0 ? Math.round(payload.width) : 900,
+          height: Number.isFinite(payload.height) && payload.height > 0 ? Math.round(payload.height) : 1600,
           savedAt: new Date().toISOString()
         };
         await writeSelectionState(currentState);
